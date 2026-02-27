@@ -1,127 +1,79 @@
-import { GoogleGenAI } from "@google/genai";
-
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
-
-
-// Refine a raw diarized transcript using Gemini
-// Fixes speaker assignments, cleans grammar, converts Hindi to Hinglish
 export async function refineTranscript(rawTranscript, speakerCount) {
-
-    const prompt = `You are a Senior Dialogue Editor. Your task is to transform a raw, messy diarized transcript into a clean, professional, and logically sound "Hinglish" conversation.
-
-YOUR TASK:
-1. **Analyze Context:** Read the entire transcript to understand the subject matter and identify the roles (e.g., Support Agent vs. Customer, Service Provider vs. Client).
-2. **Reconstruct Logic:** Fix errors where the AI assigned words to the wrong person. Ensure the dialogue follows a logical flow of "Request -> Instruction -> Confirmation."
-3. **Clean & Convert:** Fix grammar, remove stutters, and convert all Devanagari (Hindi) text into Romanized Hinglish.
+    const prompt = `You are a Senior Technical Dialogue Editor and Data Analyst. Your mission is to take a broken, raw diarized transcript and reconstruct it into a high-signal data object for a RAG-based search system.
 
 ═══════════════════════════════════
-RAW TRANSCRIPT:
+RAW TRANSCRIPT (High Error Rate):
 ${rawTranscript}
 ═══════════════════════════════════
 
-STRICT RULES:
+YOUR WORKFLOW & RULES:
 
-📌 SPEAKER ASSIGNMENT:
-- Identify the **Provider** (giving help/info) and the **User** (seeking help/info).
-- If one person is giving a step-by-step process, all those steps belong to them—don't let the diarization split them.
-- Short acknowledgments (e.g., "ji," "ok," "theek hai") belong to the person currently listening.
-- Merge fragments: If a speaker's thought is split into three lines, combine them into one meaningful sentence.
+1. **Role Analysis & Labeling:**
+   - Determine who is the 'Agent' (Provider) and who is the 'Client' (User). 
+   - Replace "Speaker 0/1" with these labels consistently.
 
-📌 TEXT CLEANUP & HINGLISH:
-- Convert ALL Devanagari script to Romanized Hinglish (e.g., "मैं देख सकता हूँ" -> "Main dekh sakta hoon").
-- **Preserve Technical Terms:** Keep industry-specific English words as they are (e.g., "Server," "Refund," "Account," "Session," "Login").
-- Remove repetitive filler words and fix broken grammar to make the conversation professional.
+2. **Vector-Optimized "High-Contrast" Summary:**
+   - Write a summary specifically for an embedding vector.
+   - **Include Contrast:** Explicitly state the technical gap (e.g., "Client struggled with X in the ERP, Agent resolved it using Y").
+   - Mention all technical entities (AnyDesk, Session years, Button names). This ensures similarity searches for "AnyDesk" or "2026 session" hit this record.
 
-📌 OUTPUT FORMAT:
-- Return ONLY a valid JSON array of objects.
-- Each object must have "speaker" (integer) and "text" (string in Hinglish).
-- Do NOT include any intro, outro, or markdown formatting. Just the JSON.
+3. **Smart Transcript Reconstruction (THE DEEP CLEAN):**
+   - **Prioritize Meaning:** The raw text is often unmeaningful. Your job is to make it meaningful. If the diarization is wrong, swap the speakers.
+   - **Rewrite for Clarity:** If a sentence is a mess of fragments, rewrite it into a complete, professional sentence that captures the *intent*.
+   - **Merge Thoughts:** Join consecutive lines from the same role into one cohesive paragraph.
+   - **Remove Noise:** Delete stutters and "ok ok ok" repetitions, but keep the "logic" of the confirmation.
 
-EXAMPLE OUTPUT:
-[
-  {"speaker": 0, "text": "Hello, main aapki kya madad kar sakta hoon?"},
-  {"speaker": 1, "text": "Ji, mera account login nahi ho raha hai."}
-]
+4. **Hinglish & Formatting:**
+   - Convert all Devanagari (Hindi) to Romanized Hinglish.
+   - Keep technical English words exactly as they are.
 
-IMPORTANT: The speaker count is ${speakerCount}. Ensure the final output is ONLY the JSON array.`;
+5. **Satisfaction Score:**
+   - Rate the Client's satisfaction from 1-10 based on the resolution and their final tone.
+
+STRICT JSON OUTPUT FORMAT:
+{
+  "summary": "Dense, technical, high-contrast summary for embeddings...",
+  "satisfactionScore": 10,
+  "detectedRoles": { "speaker0": "Agent", "speaker1": "Client" },
+  "tags": ["ERP", "Session Migration", "Technical Support"], 
+  "refinedTranscript": [
+    { "role": "Agent", "text": "Hinglish reconstructed text..." },
+    { "role": "Client", "text": "Hinglish reconstructed text..." }
+  ]
+}
+
+IMPORTANT: Return ONLY the JSON. Do not add any conversational text. Use the speaker count (${speakerCount}) to guide your role detection.`;
 
     try {
         const startTime = Date.now();
+        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-        const response = await genAI.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: prompt,
-            config: {
-                temperature: 0.15,
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature: 0.1, // Keep it low for structural integrity
                 responseMimeType: "application/json",
             }
         });
 
-        // Extract text from response
-        let text = '';
-        try {
-            text = response.text?.trim() || '';
-        } catch (e) {
-            const candidates = response.candidates || [];
-            if (candidates.length > 0) {
-                const parts = candidates[0].content?.parts || [];
-                for (const part of parts) {
-                    if (part.text && !part.thought) {
-                        text = part.text.trim();
-                    }
-                }
-            }
-        }
-
+        const data = JSON.parse(result.response.text());
         const processingTime = Date.now() - startTime;
 
-        if (!text) {
-            console.warn('⚠️ Gemini returned empty response, using original transcript');
-            return { transcript: null, processingTime };
-        }
-
-        console.log(`📝 Gemini response length: ${text.length} chars`);
-
-        // Extract JSON array
-        let jsonStr = text;
-        const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (codeBlockMatch) {
-            jsonStr = codeBlockMatch[1].trim();
-        }
-
-        const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) {
-            console.warn('⚠️ Gemini did not return valid JSON, using original transcript');
-            console.warn('   First 500 chars of response:', text.substring(0, 500));
-            return { transcript: null, processingTime };
-        }
-
-        const correctedSegments = JSON.parse(jsonMatch[0]);
-
-        if (!Array.isArray(correctedSegments) || correctedSegments.length === 0) {
-            console.warn('⚠️ Gemini returned empty or invalid array, using original transcript');
-            return { transcript: null, processingTime };
-        }
-
-        // Validate structure
-        const valid = correctedSegments.every(s =>
-            typeof s.speaker === 'number' && typeof s.text === 'string' && s.text.trim().length > 0
-        );
-
-        if (!valid) {
-            console.warn('⚠️ Gemini returned malformed segments, using original transcript');
-            return { transcript: null, processingTime };
-        }
-
-        const refinedTranscript = correctedSegments
-            .map(s => `Speaker ${s.speaker}: ${s.text}`)
+        // Joining for your database/view
+        const finalTranscriptString = data.refinedTranscript
+            .map(s => `${s.role}: ${s.text}`)
             .join('\n');
 
-        console.log(`🔧 Gemini produced ${correctedSegments.length} refined segments`);
-        return { transcript: refinedTranscript, processingTime };
+        return {
+            summary: data.summary,
+            satisfactionScore: data.satisfactionScore,
+            tags: data.tags,
+            transcript: finalTranscriptString,
+            processingTime
+        };
 
     } catch (err) {
-        console.error('⚠️ Gemini refinement failed:', err.message);
-        return { transcript: null, processingTime: 0 };
+        console.error('⚠️ Processing failed:', err.message);
+        return { transcript: null, summary: null, satisfactionScore: 0, processingTime: 0 };
     }
 }
