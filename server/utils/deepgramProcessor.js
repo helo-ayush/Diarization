@@ -7,19 +7,28 @@ const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 export async function transcribeWithDiarization(audioBuffer) {
     const startTime = Date.now();
 
-    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+    console.log(`🎙️ Sending ${(audioBuffer.length / 1024).toFixed(1)}KB to Deepgram...`);
+
+    // Wrap in a timeout so it doesn't hang forever
+    const timeoutMs = 60000;
+    const deepgramPromise = deepgram.listen.prerecorded.transcribeFile(
         audioBuffer,
         {
             model: "nova-3",
             language: "multi",
             diarize: true,
-            diarize_version: "latest",
             smart_format: true,
             punctuate: true,
             utterances: true,
             multichannel: false,
         }
     );
+
+    const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Deepgram timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+    );
+
+    const { result, error } = await Promise.race([deepgramPromise, timeoutPromise]);
 
     const processingTime = Date.now() - startTime;
     console.log(`✅ Deepgram completed in ${processingTime}ms`);

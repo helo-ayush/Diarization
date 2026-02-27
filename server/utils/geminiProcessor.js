@@ -1,3 +1,7 @@
+import { GoogleGenAI } from "@google/genai";
+
+const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
+
 export async function refineTranscript(rawTranscript, speakerCount) {
     const prompt = `You are a Senior Technical Dialogue Editor and Data Analyst. Your mission is to take a broken, raw diarized transcript and reconstruct it into a high-signal data object for a RAG-based search system.
 
@@ -46,34 +50,39 @@ IMPORTANT: Return ONLY the JSON. Do not add any conversational text. Use the spe
 
     try {
         const startTime = Date.now();
-        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature: 0.1, // Keep it low for structural integrity
+        const result = await genAI.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+            config: {
+                temperature: 0.1,
                 responseMimeType: "application/json",
             }
         });
 
-        const data = JSON.parse(result.response.text());
+        const data = JSON.parse(result.text);
         const processingTime = Date.now() - startTime;
 
         // Joining for your database/view
         const finalTranscriptString = data.refinedTranscript
             .map(s => `${s.role}: ${s.text}`)
             .join('\n');
-
         return {
             summary: data.summary,
             satisfactionScore: data.satisfactionScore,
             tags: data.tags,
-            transcript: finalTranscriptString,
+            transcript: finalTranscriptString, // The "Agent: text" format
             processingTime
         };
 
     } catch (err) {
         console.error('⚠️ Processing failed:', err.message);
-        return { transcript: null, summary: null, satisfactionScore: 0, processingTime: 0 };
+        return {
+            transcript: null,
+            summary: "Could not generate summary",
+            satisfactionScore: 0,
+            tags: [],
+            processingTime: 0
+        };
     }
 }

@@ -36,15 +36,6 @@ router.post('/', upload.single('call_recording'), async (req, res) => {
     // STEP 3: Build raw transcript with speaker filtering
     const { rawTranscript, validWords, validSpeakers, segments, lowConfWords } = buildRawTranscript(dgResult.words);
 
-    // STEP 4: Gemini refinement
-    console.log('🧠 Sending to Gemini for full transcript refinement...');
-    const geminiResult = await refineTranscript(rawTranscript, validSpeakers.length);
-    console.log(`✅ Gemini refinement completed in ${geminiResult.processingTime}ms`);
-
-    const finalTranscript = geminiResult.transcript || rawTranscript;
-    const wasRefined = geminiResult.transcript !== null;
-    const diarizationConfidence = 1 - (lowConfWords / validWords.length);
-
     // sumary =..... 
     // mongo db -> {transcription + summary + embedding}, {transcription + summary + embedding} , {transcription + summary + embedding} 
     // search -> find all customers wo got unsatisfied with our new mmeeting tool -> gemini ->  customer cmpained about meeting , meeting tools failing ...
@@ -54,17 +45,34 @@ router.post('/', upload.single('call_recording'), async (req, res) => {
     // save -> audio (saved in mongo)
     // search -> find all totally satisfied , 50
 
-    // Summary
+    console.log('🧠 Sending to Gemini for full technical analysis & refinement...');
+    const geminiResult = await refineTranscript(rawTranscript, validSpeakers.length);
+    console.log(`✅ Gemini refinement completed in ${geminiResult.processingTime}ms`);
+
+    // Logic for fallbacks
+    const finalTranscript = geminiResult.transcript || rawTranscript;
+    const wasRefined = geminiResult.transcript !== null;
+    const diarizationConfidence = 1 - (lowConfWords / validWords.length);
+
+    // Summary Console Log (Upgraded for visibility)
     console.log(`\n${'─'.repeat(60)}`);
-    console.log(`📋 RESULTS SUMMARY:`);
-    console.log(`   Words: ${validWords.length}, Speakers: ${validSpeakers.length}, Segments: ${segments.length}`);
-    console.log(`   Gemini refined: ${wasRefined ? '✅ YES' : '❌ NO (using raw)'}`);
+    console.log(`📋 ANALYSIS RESULTS:`);
+    console.log(`   Words: ${validWords.length} | Speakers: ${validSpeakers.length}`);
+    console.log(`   Satisfaction Score: ${geminiResult.satisfactionScore}/10`);
+    console.log(`   Tags: [${geminiResult.tags.join(', ')}]`);
+    console.log(`   Gemini refined: ${wasRefined ? '✅ YES' : '❌ NO'}`);
     console.log(`   Confidence: ${(diarizationConfidence * 100).toFixed(1)}%`);
-    console.log(`   Time: Deepgram=${dgResult.processingTime}ms, Gemini=${geminiResult.processingTime}ms`);
+    console.log(`   Summary Length: ${geminiResult.summary?.length || 0} chars`);
     console.log(`${'─'.repeat(60)}\n`);
 
     res.json({
       success: true,
+      // High-signal data for your Vector DB / Frontend
+      analysis: {
+        summary: geminiResult.summary,
+        satisfactionScore: geminiResult.satisfactionScore,
+        tags: geminiResult.tags,
+      },
       transcript: finalTranscript,
       speakerCount: validSpeakers.length,
       metrics: {
@@ -72,10 +80,12 @@ router.post('/', upload.single('call_recording'), async (req, res) => {
         rawSegments: segments.length,
         geminiRefined: wasRefined,
         diarizationConfidence: parseFloat(diarizationConfidence.toFixed(3)),
-        processingMs: { deepgram: dgResult.processingTime, gemini: geminiResult.processingTime }
+        processingMs: {
+          deepgram: dgResult.processingTime,
+          gemini: geminiResult.processingTime
+        }
       }
     });
-
   } catch (error) {
     console.error("Transcription Route Error:", error);
     res.status(500).json({ error: "Failed to process audio transcription" });
