@@ -18,13 +18,12 @@ router.post('/', upload.single('call_recording'), async (req, res) => {
     console.log(`📞 Processing audio: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)`);
     console.log(`${'═'.repeat(60)}`);
 
-    // STEP 1: Two-path audio processing
-    const diarizeBuffer = await cleanAudioForDiarization(req.file.buffer, { forceMono: true })
-    console.log(`✅ Audio processed: diarize=${(diarizeBuffer.length / 1024).toFixed(1)}KB`);
-
+    // STEP 1: Clean audio with ffmpeg (outputs compressed OGG, not bloated WAV)
+    const cleanedBuffer = await cleanAudioForDiarization(req.file.buffer, { forceMono: true });
+    console.log(`✅ Audio cleaned: ${(req.file.size / 1024).toFixed(0)}KB → ${(cleanedBuffer.length / 1024).toFixed(0)}KB`);
 
     // STEP 2: Deepgram transcription + diarization
-    const dgResult = await transcribeWithDiarization(diarizeBuffer);
+    const dgResult = await transcribeWithDiarization(cleanedBuffer);
 
     if (!dgResult.hasSpeech) {
       return res.json({

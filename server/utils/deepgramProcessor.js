@@ -10,15 +10,13 @@ export async function transcribeWithDiarization(audioBuffer) {
     console.log(`🎙️ Sending ${(audioBuffer.length / 1024).toFixed(1)}KB to Deepgram...`);
 
     // Wrap in a timeout so it doesn't hang forever
-    const timeoutMs = 60000;
+    const timeoutMs = 120000; // 2 minutes — diarization on larger files needs more time
     const deepgramPromise = deepgram.listen.prerecorded.transcribeFile(
         audioBuffer,
         {
             model: "nova-3",
             language: "multi",
             diarize: true,
-            smart_format: true,
-            punctuate: true,
             utterances: true,
             multichannel: false,
         }

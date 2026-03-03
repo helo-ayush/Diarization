@@ -80,7 +80,8 @@ export const cleanAudioForDiarization = (inputBuffer, options = {}) => {
         });
 
         let cmd = ffmpeg(inputStream)
-            .toFormat('wav')
+            .toFormat('ogg')       // Compressed output — same quality, ~10x smaller than WAV
+            .audioCodec('libopus') // Opus codec — best compression for speech
             .audioFrequency(16000);
 
         if (forceMono) {
