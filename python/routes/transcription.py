@@ -25,7 +25,7 @@ async def save_transcription(call_recording: UploadFile = File(...)):
         print(f"{'═' * 60}")
 
         # STEP 1: ML-based audio cleaning (noisereduce + compression)
-        cleaned_bytes = clean_audio_for_diarization(audio_bytes)
+        cleaned_bytes = clean_audio_for_diarization(audio_bytes, call_recording.filename)
 
         # STEP 2: Sarvam AI transcription + diarization (optimized for Indian languages)
         dg_result = await transcribe_with_sarvam(cleaned_bytes, call_recording.filename)

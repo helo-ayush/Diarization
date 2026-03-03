@@ -7,7 +7,7 @@ import soundfile as sf
 import noisereduce as nr
 
 
-def clean_audio_for_diarization(audio_bytes: bytes) -> bytes:
+def clean_audio_for_diarization(audio_bytes: bytes, original_filename: str = "input.wav") -> bytes:
     """
     Clean audio using ML-based noise reduction (noisereduce) + basic filtering.
     
@@ -19,10 +19,11 @@ def clean_audio_for_diarization(audio_bytes: bytes) -> bytes:
     
     Returns: OGG/Opus compressed bytes ready for Deepgram
     """
-    print("🔧 Cleaning audio with ML noise reduction...")
+    print(f"🔧 Cleaning audio {original_filename} with ML noise reduction...")
 
     # Step 1: Convert any format to WAV 16kHz mono using ffmpeg
-    with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp_in:
+    ext = os.path.splitext(original_filename)[1] or ".input"
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_in:
         tmp_in.write(audio_bytes)
         tmp_in_path = tmp_in.name
 

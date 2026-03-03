@@ -19,7 +19,8 @@ async def transcribe_with_sarvam(audio_bytes: bytes, filename: str = "audio.ogg"
     start_time = time.time()
 
     # Save audio to temp file (Sarvam SDK needs file paths)
-    with tempfile.NamedTemporaryFile(suffix=f".{filename.split('.')[-1]}", delete=False) as tmp:
+    # The input audio_bytes is already converted to OGG by audio_processor.py
+    with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
         tmp.write(audio_bytes)
         tmp_path = tmp.name
 

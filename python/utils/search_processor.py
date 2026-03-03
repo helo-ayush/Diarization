@@ -53,7 +53,7 @@ Optimized search query:"""
         return user_query
 
 
-async def vector_search(query: str, limit: int = 5) -> dict:
+async def vector_search(query: str, limit: int = 5, all_entries: bool = False) -> dict:
     """
     Full search pipeline:
     1. Optimize query with Gemini
@@ -64,7 +64,7 @@ async def vector_search(query: str, limit: int = 5) -> dict:
     start_time = time.time()
 
     # Step 1: Optimize query
-    print(f"🔎 Search query: \"{query}\"")
+    print(f"🔎 Search query: \"{query}\" (all_entries={all_entries})")
     print("   🧠 Optimizing query with Gemini...")
     optimized_query = await optimize_query(query)
 
@@ -81,15 +81,26 @@ async def vector_search(query: str, limit: int = 5) -> dict:
         }
 
     # Step 3: MongoDB Atlas Vector Search
-    print(f"   📊 Running vector search (limit={limit})...")
+    # Atlas Vector Search requires a 'limit'. To "bypass" it for 'all_entries', 
+    # we use a significantly higher limit. 1000 is a safe threshold for a single
+    # request response. In a massive production system, you'd use pagination.
+    MAX_ALL_ENTRIES = 1000 
+    effective_limit = MAX_ALL_ENTRIES if all_entries else limit
+    
+    # numCandidates should be larger than limit to ensure accuracy, 
+    # but we cap it to avoid performance degradation on large datasets.
+    num_candidates = min(effective_limit * 10, 5000) if not all_entries else 2000
+
+    print(f"   📊 Running vector search (limit={effective_limit}, candidates={num_candidates})...")
+    
     pipeline = [
         {
             "$vectorSearch": {
                 "index": "vector_index",
                 "path": "embedding",
                 "queryVector": query_embedding,
-                "numCandidates": limit * 10,  # Search wider pool
-                "limit": limit,
+                "numCandidates": num_candidates,
+                "limit": effective_limit,
             }
         },
         {

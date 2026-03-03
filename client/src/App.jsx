@@ -16,6 +16,7 @@ export default function App() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLimit, setSearchLimit] = useState(5);
+  const [allEntries, setAllEntries] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
   const [searchError, setSearchError] = useState('');
@@ -79,7 +80,11 @@ export default function App() {
       const res = await fetch(`${API_URL}/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery.trim(), limit: searchLimit }),
+        body: JSON.stringify({ 
+          query: searchQuery.trim(), 
+          limit: parseInt(searchLimit),
+          all_entries: allEntries 
+        }),
       });
       const data = await res.json();
 
@@ -107,9 +112,7 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <div className="header">
-        <h1>Diarization Model</h1>
-      </div>
+
 
       <div className="tabs">
         <button
@@ -141,7 +144,7 @@ export default function App() {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept="audio/*"
+                accept="audio/*,video/mpeg,audio/mpeg,video/mp4,audio/mp4,.mp3,.mpeg,.mpg,.m4a,.aac,.wav,.ogg"
                 className="hidden"
                 style={{ display: 'none' }}
               />
@@ -245,11 +248,25 @@ export default function App() {
                 <input
                   type="number"
                   min="1" max="50"
+                  disabled={allEntries}
                   value={searchLimit}
                   onChange={e => setSearchLimit(e.target.value)}
-                  className="search-input text-center"
+                  className={`search-input text-center ${allEntries ? 'opacity-50' : ''}`}
                   title="Limit"
                 />
+              </div>
+
+              <div className="flex items-center gap-2 px-3 border-l border-gray-100">
+                <input
+                  type="checkbox"
+                  id="allEntries"
+                  checked={allEntries}
+                  onChange={e => setAllEntries(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <label htmlFor="allEntries" className="text-xs font-medium text-gray-600 cursor-pointer whitespace-nowrap">
+                  All Entries
+                </label>
               </div>
 
               <button

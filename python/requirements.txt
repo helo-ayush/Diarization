@@ -6,6 +6,8 @@ motor==3.7.*
 deepgram-sdk==4.*
 langchain==0.3.*
 langchain-google-genai==2.*
+google-genai
+sarvamai
 noisereduce==3.*
 soundfile==0.13.*
 numpy==2.*

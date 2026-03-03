@@ -388,6 +388,35 @@ h1 {
   flex: 1;
 }
 
+.opacity-50 {
+  opacity: 0.5;
+}
+
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.border-l {
+  border-left: 1px solid #eaeaea;
+}
+
+.border-gray-100 {
+  border-color: #f3f4f6;
+}
+
+.w-4 {
+  width: 1rem;
+}
+
+.h-4 {
+  height: 1rem;
+}
+
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
 /* Text utilities */
 .text-xs {
   font-size: 0.75rem;

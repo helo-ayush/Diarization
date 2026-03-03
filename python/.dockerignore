@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+venv/
+ENV/
+env/
+.git/
+.gitignore
+.vscode/
+*.input*
+*.wav
+*.ogg
+*.clean.wav
