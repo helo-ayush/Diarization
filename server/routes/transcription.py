@@ -1,21 +1,30 @@
+# ==============================================================================
+# TRANSCRIPTION ROUTE
+# This file serves as the main orchestrator for the audio processing pipeline.
+# ==============================================================================
 from datetime import datetime, timezone
 from fastapi import APIRouter, UploadFile, File
 from utils.audio_processor import clean_audio_for_diarization
-# from utils.deepgram_processor import transcribe_with_diarization, build_raw_transcript  # Deepgram
-from utils.sarvam_processor import transcribe_with_sarvam  # Sarvam AI
-from utils.deepgram_processor import build_raw_transcript  # Still need this for speaker filtering
-from utils.gemini_processor import refine_transcript
-from utils.embedding_processor import generate_embedding
-from utils.fingerprint_processor import extract_voice_embedding
+from utils.sarvam_processor import transcribe_with_sarvam  # Sarvam AI for transcription
+from utils.deepgram_processor import build_raw_transcript  # Utility for parsing raw segment data
+from utils.gemini_processor import refine_transcript       # Gemini for sentiment analysis
+from utils.embedding_processor import generate_embedding   # Embeddings for RAG search
+from utils.fingerprint_processor import extract_voice_embedding # Pyannote Voice Fingerprinting
 from database import db
 
 router = APIRouter(redirect_slashes=False)
 
-# MongoDB collection
+# ==============================================================================
+# DATABASE COLLECTIONS
+# ==============================================================================
 transcriptions = db["transcriptions"]
 agents_collection = db["agents"]
 
 def cosine_similarity(v1, v2):
+    """
+    Computes the mathematical similarity between two embedding vectors.
+    Returns a score between 0 and 1, where 1 means exact match.
+    """
     dot = sum(a * b for a, b in zip(v1, v2))
     norm1 = sum(a * a for a in v1) ** 0.5
     norm2 = sum(b * b for b in v2) ** 0.5
@@ -24,6 +33,13 @@ def cosine_similarity(v1, v2):
     return dot / (norm1 * norm2)
 
 async def identify_agents_in_audio(audio_bytes: bytes, filename: str, segments: list, valid_speakers: list) -> dict:
+    """
+    Iterates through each valid speaker detected by the transcription service,
+    extracts an audio snippet of their voice, and compares it to enrolled agents 
+    in the database via Cosine Similarity.
+    
+    Returns a dictionary mapping speaker IDs to Agent Names (e.g. {"0": "Ayush"})
+    """
     agents = await agents_collection.find({}).to_list(length=100)
     if not agents:
         return {}
@@ -31,7 +47,7 @@ async def identify_agents_in_audio(audio_bytes: bytes, filename: str, segments: 
     agent_map = {}
     print("🔍 Attempting Pyannote Voice Fingerprinting for Agent Identification...")
     for spk in valid_speakers:
-        # Find the longest segment for this speaker
+        # Find the longest continuous segment for this speaker to get a clean voice sample
         spk_segments = [s for s in segments if s["speaker"] == spk]
         if not spk_segments:
             continue
@@ -39,6 +55,7 @@ async def identify_agents_in_audio(audio_bytes: bytes, filename: str, segments: 
         longest_seg = max(spk_segments, key=lambda s: s["end"] - s["start"])
         duration = longest_seg["end"] - longest_seg["start"]
         
+        # Audio snippets under 1 second yield poor embeddings.
         if duration < 1.0:
             print(f"   ⚠️ Speaker {spk} longest segment is too short ({duration:.1f}s). Skipping.")
             continue
@@ -46,13 +63,14 @@ async def identify_agents_in_audio(audio_bytes: bytes, filename: str, segments: 
         print(f"   🎧 Extracting embedding for Speaker {spk} ({longest_seg['start']:.1f}s - {longest_seg['end']:.1f}s)...")
         
         try:
-            # Add padding to start/end to get better audio context
+            # Add a 0.5s padding to start/end to gather better context for the neural network
             start_time = max(0.0, longest_seg["start"] - 0.5)
             end_time = longest_seg["end"] + 0.5
             
+            # Generate the 256-dimensional Voice Print
             emb = extract_voice_embedding(audio_bytes, filename, start_sec=start_time, end_sec=end_time)
             
-            # Compare with all agents
+            # Compare the generated embedding against all known agents in MongoDB
             best_match = None
             best_score = -1
             
@@ -62,7 +80,8 @@ async def identify_agents_in_audio(audio_bytes: bytes, filename: str, segments: 
                     best_score = score
                     best_match = agent["name"]
             
-            # Threshold for positive identification (usually > 0.4 for resnet34 on brief clips)
+            # 0.45 is typically a confident threshold for the ResNet34 architecture
+            # If matched, we record it into our agent map.
             if best_score > 0.45:
                 agent_map[spk] = best_match
                 print(f"   ✅ Speaker {spk} matched as {best_match} (Score: {best_score:.3f})")
@@ -74,10 +93,17 @@ async def identify_agents_in_audio(audio_bytes: bytes, filename: str, segments: 
 
     return agent_map
 
+# ==============================================================================
+# MAIN PIPELINE ENDPOINT
+# ==============================================================================
 @router.post("")
 @router.post("/")
 async def save_transcription(call_recording: UploadFile = File(...)):
-    try:
+    """
+    Receives an audio file, transcribes it, identifies the agent via voice 
+    fingerprinting, generates sentiment analysis via Gemini, and stores the 
+    result + vector embeddings into MongoDB for later search.
+    """
         audio_bytes = await call_recording.read()
 
         print(f"\n{'═' * 60}")

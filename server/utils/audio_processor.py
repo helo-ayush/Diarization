@@ -1,3 +1,8 @@
+# ==============================================================================
+# AUDIO PROCESSOR
+# Handles noise reduction, VAD (Voice Activity Detection), and audio conversion.
+# This prevents garbage audio from being sent to transcription APIs.
+# ==============================================================================
 import io
 import subprocess
 import tempfile

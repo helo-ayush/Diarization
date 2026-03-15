@@ -1,3 +1,8 @@
+# ==============================================================================
+# DEEPGRAM PROCESSOR (LEGACY / UTILITIES)
+# Originally used for STT, now primarily holds `build_raw_transcript` helper
+# to group word-level data cleanly by speaker segments.
+# ==============================================================================
 import os
 import time
 import asyncio

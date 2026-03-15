@@ -1,3 +1,7 @@
+# ==============================================================================
+# GEMINI LLM PROCESSOR
+# Handles sentiment analysis, technical summary generation, and formatting.
+# ==============================================================================
 import os
 import json
 import time
@@ -7,7 +11,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 
 
-# Initialize LangChain Gemini model
+# Initialize LangChain Gemini model using API key from environment
+# Temperature is set to 0.1 to force deterministic, predictable output (less hallucination)
 llm = ChatGoogleGenerativeAI(
     model="gemini-3-flash-preview",
     google_api_key=os.getenv("GEMINI_API_KEY"),

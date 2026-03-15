@@ -1,3 +1,7 @@
+# ==============================================================================
+# VECTOR SEARCH PROCESSOR
+# Connects Gemini query rewriting with MongoDB Atlas Vector Search indexing.
+# ==============================================================================
 import os
 import asyncio
 import time

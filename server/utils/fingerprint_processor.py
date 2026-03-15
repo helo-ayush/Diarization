@@ -1,3 +1,8 @@
+# ==============================================================================
+# VOICE FINGERPRINT PROCESSOR
+# Extracts 256-dimensional math vectors directly from raw audio waves.
+# Uses Pyannote (WeSpeaker ResNet) to uniquely identify human voices.
+# ==============================================================================
 import io
 import os
 import tempfile

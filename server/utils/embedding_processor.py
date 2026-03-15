@@ -1,3 +1,8 @@
+# ==============================================================================
+# TEXT EMBEDDING PROCESSOR
+# Uses Google GenAI to map text summaries into a 768-dimensional Math Vector 
+# to be saved into MongoDB Atlas Vector Search.
+# ==============================================================================
 import os
 import asyncio
 from google import genai

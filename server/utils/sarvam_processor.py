@@ -1,3 +1,8 @@
+# ==============================================================================
+# SARVAM AI PROCESSOR
+# Handles Speech-to-Text and Diarization (speaker separation) via Sarvam AI.
+# Optimized for Indian languages (Hindi, Hinglish, English, etc.)
+# ==============================================================================
 import os
 import time
 import tempfile
