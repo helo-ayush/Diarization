@@ -184,13 +184,14 @@ cd Diarization
 Inside the `server/` folder, you will find a file called `.env.example`.
 Create a copy of it and name it `.env`:
 ```bash
-cp server/.env.example server/.env
+cp .env.example .env
 ```
-Open `server/.env` and insert your actual API keys (Gemini, Sarvam, HuggingFace) and your MongoDB URI.
+Open `.env` and insert your actual API keys (Gemini, Sarvam, HuggingFace) and your MongoDB URI.
 
 ### 3. Run with Docker Compose
-From the root of the project (where `docker-compose.yml` is located), simply run:
+Navigate into the `server/` directory (where `docker-compose.yml` is located) and run:
 ```bash
+cd server
 docker-compose up --build
 ```
 

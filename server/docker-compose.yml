@@ -3,14 +3,14 @@ version: "3.8"
 services:
   backend:
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
     container_name: diarization_backend
     ports:
       - "8000:7860" # Container uses 7860 for huggingface
     env_file:
-      - ./server/.env
+      - .env
     volumes:
-      - ./server:/app
+      - .:/app
     command: uvicorn main:app --host 0.0.0.0 --port 7860 --reload
     restart: unless-stopped
