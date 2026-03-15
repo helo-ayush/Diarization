@@ -168,11 +168,12 @@ curl -X POST "http://localhost:8000/api/v1/search" \
 
 ## 🏗️ Building & Installation
 
-We use **Docker** to completely automate the setup of this project. You do not need to worry about manually installing Python, FFmpeg, Node.js, or patching broken AI libraries—Docker handles it all automatically!
+We provide two ways to run this project: **Using Docker (Highly Recommended)** or **Manually**. Docker handles complex dependencies like FFmpeg and library patching automatically.
 
 ### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed on your machine.
 - [Git](https://git-scm.com/) installed.
+- (If using Docker) [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed on your machine.
+- (If running manually) Python 3.10+ and [FFmpeg](https://ffmpeg.org/download.html) installed on your system.
 
 ### 1. Clone the Repository
 ```bash
@@ -181,14 +182,24 @@ cd Diarization
 ```
 
 ### 2. Set Up Environment Variables
-Inside the `server/` folder, you will find a file called `.env.example`.
-Create a copy of it and name it `.env`:
+Inside the `server/` folder, you will find a template file called `.env.example`. You need to create a real `.env` file from it.
+
+**Option A: Using Terminal**
 ```bash
+cd server
 cp .env.example .env
 ```
-Open `.env` and insert your actual API keys (Gemini, Sarvam, HuggingFace) and your MongoDB URI.
 
-### 3. Run with Docker Compose
+**Option B: Manual Method (VS Code, Notepad, etc.)**
+1. Open the `server/` folder in your code editor.
+2. Create a brand new file and name it exactly `.env`.
+3. Open the `.env.example` file, copy all of the text inside it, and paste it into your new `.env` file. Save it.
+
+Finally, open your `.env` file and insert your actual API keys (Gemini, Sarvam, HuggingFace) and your MongoDB URI.
+
+### 3. Run the Application
+
+#### Option A: Run with Docker Compose (Recommended)
 Navigate into the `server/` directory (where `docker-compose.yml` is located) and run:
 ```bash
 cd server
@@ -201,5 +212,31 @@ docker-compose up --build
 3. Install all Python dependencies.
 4. Auto-patch the `pyannote` library via `patch_pyannote.py`.
 5. Start the backend API on `http://localhost:8000`.
+
+#### Option B: Run Manually (Without Docker)
+If you prefer not to use Docker, you can run the server directly on your local machine:
+
+1. **Install FFmpeg**: Ensure [FFmpeg](https://ffmpeg.org/download.html) is installed and accessible in your system's PATH.
+2. **Set up Python Environment**: Open your terminal inside the `server/` folder.
+   ```bash
+   cd server
+   # Create and activate a virtual environment (Recommended)
+   python -m venv venv
+   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+   ```
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. **Patch Pyannote Compatibility**: This step is critical to fix the upstream breaking changes mentioned earlier.
+   ```bash
+   python patch_pyannote.py
+   ```
+5. **Start the API Server**:
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+---
 
 You can now send requests to `http://localhost:8000` via Postman or your browser!
