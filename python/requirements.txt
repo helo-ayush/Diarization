@@ -11,3 +11,13 @@ sarvamai
 noisereduce==3.*
 soundfile==0.13.*
 numpy==2.*
+torch
+torchaudio
+torchvision
+
+# Voice Fingerprinting
+# IMPORTANT: After installing, run: python patch_pyannote.py
+# This fixes compatibility issues between pyannote + torchaudio 2.x + numpy 2.x + huggingface_hub 0.23+
+pyannote.audio==3.1.1
+huggingface_hub>=0.23.0
+speechbrain

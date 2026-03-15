@@ -6,13 +6,73 @@ from utils.sarvam_processor import transcribe_with_sarvam  # Sarvam AI
 from utils.deepgram_processor import build_raw_transcript  # Still need this for speaker filtering
 from utils.gemini_processor import refine_transcript
 from utils.embedding_processor import generate_embedding
+from utils.fingerprint_processor import extract_voice_embedding
 from database import db
 
 router = APIRouter(redirect_slashes=False)
 
 # MongoDB collection
 transcriptions = db["transcriptions"]
+agents_collection = db["agents"]
 
+def cosine_similarity(v1, v2):
+    dot = sum(a * b for a, b in zip(v1, v2))
+    norm1 = sum(a * a for a in v1) ** 0.5
+    norm2 = sum(b * b for b in v2) ** 0.5
+    if norm1 == 0 or norm2 == 0:
+        return 0
+    return dot / (norm1 * norm2)
+
+async def identify_agents_in_audio(audio_bytes: bytes, filename: str, segments: list, valid_speakers: list) -> dict:
+    agents = await agents_collection.find({}).to_list(length=100)
+    if not agents:
+        return {}
+
+    agent_map = {}
+    print("🔍 Attempting Pyannote Voice Fingerprinting for Agent Identification...")
+    for spk in valid_speakers:
+        # Find the longest segment for this speaker
+        spk_segments = [s for s in segments if s["speaker"] == spk]
+        if not spk_segments:
+            continue
+            
+        longest_seg = max(spk_segments, key=lambda s: s["end"] - s["start"])
+        duration = longest_seg["end"] - longest_seg["start"]
+        
+        if duration < 1.0:
+            print(f"   ⚠️ Speaker {spk} longest segment is too short ({duration:.1f}s). Skipping.")
+            continue
+            
+        print(f"   🎧 Extracting embedding for Speaker {spk} ({longest_seg['start']:.1f}s - {longest_seg['end']:.1f}s)...")
+        
+        try:
+            # Add padding to start/end to get better audio context
+            start_time = max(0.0, longest_seg["start"] - 0.5)
+            end_time = longest_seg["end"] + 0.5
+            
+            emb = extract_voice_embedding(audio_bytes, filename, start_sec=start_time, end_sec=end_time)
+            
+            # Compare with all agents
+            best_match = None
+            best_score = -1
+            
+            for agent in agents:
+                score = cosine_similarity(emb, agent["voice_embedding"])
+                if score > best_score:
+                    best_score = score
+                    best_match = agent["name"]
+            
+            # Threshold for positive identification (usually > 0.4 for resnet34 on brief clips)
+            if best_score > 0.45:
+                agent_map[spk] = best_match
+                print(f"   ✅ Speaker {spk} matched as {best_match} (Score: {best_score:.3f})")
+            else:
+                print(f"   ❌ Speaker {spk} did not match any agent (Best score: {best_score:.3f} for {best_match})")
+                
+        except Exception as e:
+            print(f"   ⚠️ Error extracting embedding for Speaker {spk}: {e}")
+
+    return agent_map
 
 @router.post("")
 @router.post("/")
@@ -38,12 +98,22 @@ async def save_transcription(call_recording: UploadFile = File(...)):
 
         # STEP 3: Build raw transcript with speaker filtering
         raw_data = build_raw_transcript(dg_result["words"])
+        
+        # STEP 3.5: Identify Agents via Voice Fingerprinting
+        agent_map = await identify_agents_in_audio(cleaned_bytes, call_recording.filename, raw_data["segments"], raw_data["valid_speakers"])
+        
+        # Re-build raw transcript if any agents were found
+        pynnote_diarized = False
+        if agent_map:
+            pynnote_diarized = True
+            raw_data = build_raw_transcript(dg_result["words"], agent_map=agent_map)
 
         # STEP 4: LangChain + Gemini refinement
         print("🧠 Sending to Gemini for full technical analysis & refinement...")
         gemini_result = await refine_transcript(
             raw_data["raw_transcript"],
-            len(raw_data["valid_speakers"])
+            len(raw_data["valid_speakers"]),
+            pynnote_diarized=pynnote_diarized
         )
         print(f"✅ Gemini refinement completed in {gemini_result['processing_time']}ms")
 
@@ -71,11 +141,13 @@ async def save_transcription(call_recording: UploadFile = File(...)):
                 "rawSegments": len(raw_data["segments"]),
                 "geminiRefined": was_refined,
                 "diarizationConfidence": round(diarization_confidence, 3),
+                "pynoteDiarized": pynnote_diarized,
                 "processingMs": {
                     "stt": dg_result["processing_time"],
                     "gemini": gemini_result["processing_time"],
                 },
             },
+            "pynoteDiarized": pynnote_diarized,
             "embedding": embedding,
             "createdAt": datetime.now(timezone.utc),
         }
@@ -91,6 +163,7 @@ async def save_transcription(call_recording: UploadFile = File(...)):
         print(f"   Satisfaction Score: {gemini_result['satisfaction_score']}/10")
         print(f"   Tags: [{', '.join(gemini_result['tags'])}]")
         print(f"   Gemini refined: {'✅ YES' if was_refined else '❌ NO'}")
+        print(f"   Pyannote matched: {'✅ YES' if pynnote_diarized else '❌ NO'}")
         print(f"   Confidence: {diarization_confidence * 100:.1f}%")
         print(f"   Embedding: {len(embedding)} dims")
         print(f"   MongoDB ID: {doc_id}")
@@ -100,6 +173,7 @@ async def save_transcription(call_recording: UploadFile = File(...)):
         return {
             "success": True,
             "_id": doc_id,
+            "pynoteDiarized": pynnote_diarized,
             "analysis": {
                 "summary": summary,
                 "satisfactionScore": gemini_result["satisfaction_score"],
@@ -113,6 +187,7 @@ async def save_transcription(call_recording: UploadFile = File(...)):
                 "rawSegments": len(raw_data["segments"]),
                 "geminiRefined": was_refined,
                 "diarizationConfidence": round(diarization_confidence, 3),
+                "pynoteDiarized": pynnote_diarized,
                 "processingMs": {
                     "stt": dg_result["processing_time"],
                     "gemini": gemini_result["processing_time"],

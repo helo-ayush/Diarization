@@ -7,21 +7,35 @@ import soundfile as sf
 import noisereduce as nr
 
 
+import torch
+import warnings
+
+warnings.filterwarnings("ignore")
+
+print("⏳ Loading Silero VAD model (downloading if first time)...")
+vad_model, vad_utils = torch.hub.load(
+    repo_or_dir="snakers4/silero-vad", 
+    model="silero_vad", 
+    force_reload=False, 
+    onnx=False
+)
+(get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = vad_utils
+print("✅ Silero VAD loaded.")
+
 def clean_audio_for_diarization(audio_bytes: bytes, original_filename: str = "input.wav") -> bytes:
     """
-    Clean audio using ML-based noise reduction (noisereduce) + basic filtering.
+    Clean audio using ML-based VAD (Silero) + Noise Reduction (noisereduce).
     
     Pipeline:
     1. ffmpeg converts any input format → WAV (16kHz, mono) in memory
-    2. noisereduce applies ML spectral gating noise reduction
-    3. Highpass/lowpass filtering via FFT
-    4. ffmpeg compresses result → OGG/Opus for fast upload
-    
-    Returns: OGG/Opus compressed bytes ready for Deepgram
+    2. Silero VAD detects and extracts only speech segments (ignoring noise/silence)
+    3. noisereduce applies ML spectral gating noise reduction
+    4. Highpass/lowpass filtering via FFT
+    5. ffmpeg compresses result → OGG/Opus for fast upload
     """
-    print(f"🔧 Cleaning audio {original_filename} with ML noise reduction...")
+    print(f"🔧 Cleaning audio {original_filename} with ML noise reduction & VAD...")
 
-    # Step 1: Convert any format to WAV 16kHz mono using ffmpeg
+    # Step 1: Convert to WAV 16kHz mono using ffmpeg
     ext = os.path.splitext(original_filename)[1] or ".input"
     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_in:
         tmp_in.write(audio_bytes)
@@ -45,11 +59,33 @@ def clean_audio_for_diarization(audio_bytes: bytes, original_filename: str = "in
         # Step 2: Load WAV into numpy
         samples, sample_rate = sf.read(tmp_wav_path, dtype="float32")
 
-        # Step 3: ML Noise Reduction (the big upgrade over ffmpeg's afftdn)
-        # noisereduce uses spectral gating: it learns the noise profile
-        # and subtracts it, preserving speech characteristics.
+        # Step 3: ML Voice Activity Detection (Silero VAD)
+        # Accurately snips out all non-speech audio
+        tensor_samples = torch.from_numpy(samples)
+        
+        # We configure VAD to be more forgiving for short utterances (like numbers)
+        # and add padding to prevent abrupt clipping.
+        speech_timestamps = get_speech_timestamps(
+            tensor_samples, 
+            vad_model, 
+            sampling_rate=sample_rate,
+            threshold=0.3,                 # Lower threshold to catch quieter speech
+            min_speech_duration_ms=100,    # Lower minimum duration for short words (like "one")
+            min_silence_duration_ms=700,   # If silence is < 700ms, don't split the audio. This keeps sentences natural.
+            speech_pad_ms=250              # Add 250ms of padding to the start and end of every speech chunk so it doesn't sound clipped
+        )
+        
+        if not speech_timestamps:
+            print("⚠️ No speech detected using Silero VAD. Using original audio...")
+            speech_samples = samples
+        else:
+            vad_tensor = collect_chunks(speech_timestamps, tensor_samples)
+            speech_samples = vad_tensor.numpy()
+            print(f"✂️ VAD trimming: {(len(samples)/16000):.1f}s → {(len(speech_samples)/16000):.1f}s")
+
+        # Step 4: ML Noise Reduction
         cleaned = nr.reduce_noise(
-            y=samples,
+            y=speech_samples,
             sr=sample_rate,
             prop_decrease=0.85,       # Remove 85% of noise
             stationary=False,         # Handle non-stationary noise (traffic, wind)

@@ -25,7 +25,9 @@ WORKDIR /app
 # Copy requirements and install dependencies
 # We copy requirements first to leverage Docker cache
 COPY --chown=user requirements.txt .
+COPY --chown=user patch_pyannote.py .
 RUN pip install --no-cache-dir --user -r requirements.txt
+RUN python patch_pyannote.py
 
 # Copy the rest of the application code
 COPY --chown=user . .

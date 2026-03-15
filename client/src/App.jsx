@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, FileAudio, Search, Target, Loader2, Tag, CheckCircle2, ChevronDown, ChevronUp, X, Code } from 'lucide-react';
+import { Upload, FileAudio, Search, Target, Loader2, Tag, CheckCircle2, ChevronDown, ChevronUp, X, Code, UserCheck } from 'lucide-react';
 import './App.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -21,6 +21,51 @@ export default function App() {
   const [searchResults, setSearchResults] = useState(null);
   const [searchError, setSearchError] = useState('');
   const [selectedResult, setSelectedResult] = useState(null);
+
+  // ---------- ENROLL AGENT PIPELINE ----------
+  const [agentName, setAgentName] = useState('');
+  const [agentFile, setAgentFile] = useState(null);
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [enrollResult, setEnrollResult] = useState(null);
+  const [enrollError, setEnrollError] = useState('');
+  const agentFileInputRef = useRef(null);
+
+  const handleAgentFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setAgentFile(e.target.files[0]);
+      setEnrollError('');
+    }
+  };
+
+  const handleEnroll = async (e) => {
+    e.preventDefault();
+    if (!agentFile || !agentName.trim()) return;
+
+    setIsEnrolling(true);
+    setEnrollError('');
+    setEnrollResult(null);
+
+    const formData = new FormData();
+    formData.append('name', agentName.trim());
+    formData.append('voice_sample', agentFile);
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/agents/enroll`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (data.error || !data.success) throw new Error(data.detail || data.error || data.message || 'Failed to enroll agent');
+      setEnrollResult(data);
+      setAgentName('');
+      setAgentFile(null);
+    } catch (err) {
+      setEnrollError(err.message || 'Failed to enroll agent');
+    } finally {
+      setIsEnrolling(false);
+    }
+  };
 
   // ---------- SAVE PIPELINE ----------
 
@@ -51,7 +96,7 @@ export default function App() {
     formData.append('call_recording', file);
 
     try {
-      const res = await fetch(`${API_URL}/save`, {
+      const res = await fetch(`${API_URL}/api/v1/transcriptions`, {
         method: 'POST',
         body: formData,
       });
@@ -77,7 +122,7 @@ export default function App() {
     setSearchResults(null);
 
     try {
-      const res = await fetch(`${API_URL}/search`, {
+      const res = await fetch(`${API_URL}/api/v1/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -126,6 +171,12 @@ export default function App() {
           onClick={() => setActiveTab('search')}
         >
           <Search size={16} /> Search
+        </button>
+        <button
+          className={`tab ${activeTab === 'agents' ? 'active' : ''}`}
+          onClick={() => setActiveTab('agents')}
+        >
+          <UserCheck size={16} /> Agents
         </button>
       </div>
 
@@ -332,6 +383,81 @@ export default function App() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* AGENTS TAB */}
+        {activeTab === 'agents' && (
+          <div className="panel animate-fade-in">
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2">Enroll New Agent</h3>
+              <p className="text-xs text-gray-500">Record or upload a clear 5-15 second voice sample of the agent speaking.</p>
+            </div>
+            
+            <form onSubmit={handleEnroll}>
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Agent Name (e.g., 'Agent Rahul')"
+                  value={agentName}
+                  onChange={e => setAgentName(e.target.value)}
+                  className="search-input w-full"
+                  required
+                />
+              </div>
+
+              <div
+                className={`upload-zone mb-2 ${isDragOver ? 'drag-over' : ''} ${agentFile ? 'has-file' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setIsDragOver(false); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    setAgentFile(e.dataTransfer.files[0]);
+                    setEnrollError('');
+                  }
+                }}
+                onClick={() => agentFileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={agentFileInputRef}
+                  onChange={handleAgentFileChange}
+                  accept="audio/*,video/mpeg,audio/mpeg,video/mp4,audio/mp4,.mp3,.mpeg,.mpg,.m4a,.aac,.wav,.ogg"
+                  className="hidden"
+                  style={{ display: 'none' }}
+                />
+                <FileAudio size={24} className="upload-icon" />
+                <div className="upload-text">
+                  {agentFile ? agentFile.name : 'Select Agent Voice Sample'}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary w-full mt-6"
+                disabled={!agentFile || !agentName.trim() || isEnrolling}
+              >
+                {isEnrolling ? (
+                  <><Loader2 size={16} className="spin" /> Extracting Fingerprint...</>
+                ) : (
+                  'Enroll Agent'
+                )}
+              </button>
+            </form>
+
+            {enrollError && <div className="error-box mt-6"><Target size={16} /> {enrollError}</div>}
+            
+            {enrollResult && (
+              <div className="results-container mt-6 animate-slide-up border border-green-200 bg-green-50 p-4 rounded-md flex items-center gap-3">
+                <CheckCircle2 size={24} className="text-green-600" />
+                <div>
+                  <h4 className="text-sm font-semibold text-green-900">Enrollment Successful</h4>
+                  <p className="text-xs text-green-700">{enrollResult.message}</p>
+                </div>
               </div>
             )}
           </div>

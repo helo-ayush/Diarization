@@ -74,7 +74,7 @@ async def transcribe_with_diarization(audio_bytes: bytes) -> dict:
     return {"words": words, "has_speech": True, "processing_time": processing_time}
 
 
-def build_raw_transcript(words: list) -> dict:
+def build_raw_transcript(words: list, agent_map: dict = None) -> dict:
     """
     Filter out background noise speakers (< 5% word share)
     and build a raw transcript string from valid words.
@@ -107,14 +107,16 @@ def build_raw_transcript(words: list) -> dict:
         if current_seg is None or current_seg["speaker"] != w["speaker"]:
             if current_seg:
                 segments.append(current_seg)
-            current_seg = {"speaker": w["speaker"], "words": [w["word"]]}
+            current_seg = {"speaker": w["speaker"], "words": [w["word"]], "start": w.get("start", 0), "end": w.get("end", 0)}
         else:
             current_seg["words"].append(w["word"])
+            current_seg["end"] = w.get("end", current_seg["end"])
     if current_seg:
         segments.append(current_seg)
 
+    agent_map = agent_map or {}
     raw_transcript = "\n".join(
-        f"Speaker {s['speaker']}: {' '.join(s['words'])}" for s in segments
+        f"{agent_map.get(s['speaker'], f'Speaker {s['speaker']}')}: {' '.join(s['words'])}" for s in segments
     )
 
     # Confidence stats

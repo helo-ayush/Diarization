@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./python
+      dockerfile: Dockerfile
+    container_name: diarization_backend
+    ports:
+      - "8000:7860" # Container uses 7860 for huggingface
+    env_file:
+      - ./python/.env
+    volumes:
+      - ./python:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 7860 --reload
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: diarization_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./client:/app
+      - /app/node_modules # prevent local node_modules from overwriting container's
+    depends_on:
+      - backend
+    restart: unless-stopped

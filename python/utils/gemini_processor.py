@@ -26,8 +26,9 @@ IMPORTANT CONTEXT: This transcript has already been cleaned with ML-based audio 
 YOUR WORKFLOW & RULES:
 
 1. **Role Analysis & Labeling:**
-   - Determine who is the 'Agent' (Provider) and who is the 'Client' (User). 
-   - Replace "Speaker 0/1" with these labels consistently.
+{pynote_context}
+   - **CRITICAL:** If a speaker is ALREADY named (e.g., "Agent Ayush" or "Ayush" or "Customer"), their role has already been explicitly identified. Keep their explicit name exactly as it appears. 
+   - **CRITICAL**: When returning the `refinedTranscript`, the `role` field MUST be exactly the speaker's name if they have one (e.g. "Ayush"). Otherwise use "Agent" or "Client".
 
 2. **Vector-Optimized Summary:**
    - Write a dense summary mentioning all technical entities (app names, features, error messages).
@@ -54,22 +55,36 @@ STRICT JSON OUTPUT FORMAT (return ONLY this JSON, nothing else):
   "detectedRoles": {{ "speaker0": "Agent", "speaker1": "Client" }},
   "tags": ["ERP", "Technical Support"], 
   "refinedTranscript": [
-    {{ "role": "Agent", "text": "Lightly cleaned Hinglish text..." }},
-    {{ "role": "Client", "text": "Lightly cleaned Hinglish text..." }}
-  ]
+      {{ "role": "Ayush", "text": "Lightly cleaned Hinglish text..." }},
 }}
 
 Speaker count is {speaker_count}. Return ONLY the JSON object."""
 
 
-async def refine_transcript(raw_transcript: str, speaker_count: int) -> dict:
+async def refine_transcript(raw_transcript: str, speaker_count: int, pynnote_diarized: bool = False) -> dict:
     """
     Refine a raw diarized transcript using LangChain + Gemini.
     """
     print("   📝 Building Gemini prompt...")
+    
+    # Modify the prompt rules slightly if Pyannote already identified the agent
+    if pynnote_diarized:
+        pynote_context = (
+            "   - **CRITICAL:** Our Pyannote voice fingerprinting model has ALREADY identified the Agent's name in the transcript. "
+            "You DO NOT need to guess or figure out who the Agent is vs the Customer. "
+            "Assume the named person is the Agent, and any generic 'Speaker X' is the Customer. "
+            "When returning the `refinedTranscript`, the `role` field MUST be exactly the agent's actual name (e.g. 'Ayush'). DO NOT just return 'Agent'."
+        )
+    else:
+        pynote_context = (
+            "   - If the transcript simply says 'Speaker 0' or 'Speaker X', determine who is the 'Agent' (Provider) "
+            "and who is the 'Client' (User) based on the context of the conversation and their dialogue."
+        )
+
     prompt = PROMPT_TEMPLATE.format(
         raw_transcript=raw_transcript,
-        speaker_count=speaker_count
+        speaker_count=speaker_count,
+        pynote_context=pynote_context
     )
     print(f"   📝 Prompt length: {len(prompt)} chars")
 

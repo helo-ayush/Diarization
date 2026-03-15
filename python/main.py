@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import mongo_client
 from routes.transcription import router as transcription_router
 from routes.search import router as search_router
+from routes.agents import router as agents_router
 
 
 @asynccontextmanager
@@ -48,5 +49,6 @@ async def health():
 
 
 # API Routes
-app.include_router(transcription_router, prefix="/save")
-app.include_router(search_router, prefix="/search")
+app.include_router(transcription_router, prefix="/api/v1/transcriptions")
+app.include_router(search_router, prefix="/api/v1/search")
+app.include_router(agents_router, prefix="/api/v1/agents")

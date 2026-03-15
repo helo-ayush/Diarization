@@ -1,3 +1,16 @@
 .env
-venv
-_pycache_
+venv/
+__pycache__/
+*.pyc
+
+# Downloaded AI models (too large for git)
+pretrained_models/
+
+# Temp test & debug files
+test_audio.py
+traceback.log
+*.log
+*.ogg
+*.mp3
+*.wav
+*.mpeg

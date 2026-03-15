@@ -1,0 +1,29 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# AI Models (too large for git — downloaded automatically on first run)
+pretrained_models/
+
+# Temp test and debug files
+test_audio.py
+traceback.log
+*.log
+*.ogg
+*.mp3
+*.wav
+*.mpeg
+
+# Node / Client
+node_modules/
+client/.env
+
+# Build artifacts
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
