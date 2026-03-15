@@ -120,9 +120,15 @@ def build_raw_transcript(words: list, agent_map: dict = None) -> dict:
         segments.append(current_seg)
 
     agent_map = agent_map or {}
-    raw_transcript = "\n".join(
-        f"{agent_map.get(s['speaker'], f'Speaker {s['speaker']}')}: {' '.join(s['words'])}" for s in segments
-    )
+    
+    formatted_segments = []
+    for s in segments:
+        spk_id = s.get("speaker")
+        speaker_name = agent_map.get(spk_id, f"Speaker {spk_id}")
+        words_text = " ".join(s["words"])
+        formatted_segments.append(f"{speaker_name}: {words_text}")
+        
+    raw_transcript = "\n".join(formatted_segments)
 
     # Confidence stats
     avg_confidence = sum(w["confidence"] for w in valid_words) / len(valid_words) if valid_words else 0
