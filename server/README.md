@@ -202,4 +202,4 @@ docker-compose up --build
 4. Auto-patch the `pyannote` library via `patch_pyannote.py`.
 5. Start the backend API on `http://localhost:8000`.
 
-You can now start your local frontend manually, or send requests to `http://localhost:8000` via Postman or your browser!
+You can now send requests to `http://localhost:8000` via Postman or your browser!
