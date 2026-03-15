@@ -181,17 +181,12 @@ cd Diarization
 ```
 
 ### 2. Set Up Environment Variables
-Inside the `python/` folder, you will find a file called `.env.example`.
+Inside the `server/` folder, you will find a file called `.env.example`.
 Create a copy of it and name it `.env`:
 ```bash
-cp python/.env.example python/.env
+cp server/.env.example server/.env
 ```
-Open `python/.env` and insert your actual API keys (Gemini, Sarvam, HuggingFace) and your MongoDB URI.
-
-*(Optional)* Do the same for the frontend:
-```bash
-cp client/.env.example client/.env
-```
+Open `server/.env` and insert your actual API keys (Gemini, Sarvam, HuggingFace) and your MongoDB URI.
 
 ### 3. Run with Docker Compose
 From the root of the project (where `docker-compose.yml` is located), simply run:
@@ -205,6 +200,5 @@ docker-compose up --build
 3. Install all Python dependencies.
 4. Auto-patch the `pyannote` library via `patch_pyannote.py`.
 5. Start the backend API on `http://localhost:8000`.
-6. Start the React frontend on `http://localhost:5173`.
 
-You can now open `http://localhost:5173` in your browser and start processing call center audio!
+You can now start your local frontend manually, or send requests to `http://localhost:8000` via Postman or your browser!
