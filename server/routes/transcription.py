@@ -104,6 +104,7 @@ async def save_transcription(call_recording: UploadFile = File(...)):
     fingerprinting, generates sentiment analysis via Gemini, and stores the 
     result + vector embeddings into MongoDB for later search.
     """
+    try:
         audio_bytes = await call_recording.read()
 
         print(f"\n{'═' * 60}")
