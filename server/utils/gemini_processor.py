@@ -46,7 +46,8 @@ YOUR WORKFLOW & RULES:
    - **Fix speaker assignments** only where logically backward.
    - **Merge fragments** when a speaker's thought is split across consecutive lines.
 
-4. **Formatting:**
+4. **Formatting & Numbers:**
+   - Convert any phonetically spelled-out numbers (e.g., 'pachchis', 'chhabbees', 'twenty five') back into numeric digits (25, 26, 25).
    - Keep technical English words exactly as they are.
 
 5. **Satisfaction Score:**
