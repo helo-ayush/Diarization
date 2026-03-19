@@ -100,14 +100,7 @@ async def refine_transcript(raw_transcript: str, speaker_count: int, pynnote_dia
         # Step 1: Call Gemini via LangChain (use thread + timeout to prevent hanging)
         print("   🔄 Calling Gemini via LangChain...")
         message = HumanMessage(content=prompt)
-        try:
-            response = await asyncio.wait_for(
-                asyncio.to_thread(llm.invoke, [message]),
-                timeout=60
-            )
-        except asyncio.TimeoutError:
-            print("   ❌ Gemini timed out after 60s")
-            return _error_result()
+        response = await asyncio.to_thread(llm.invoke, [message])
         
         elapsed = int((time.time() - start_time) * 1000)
         print(f"   ✅ Gemini responded in {elapsed}ms")
