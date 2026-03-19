@@ -34,7 +34,7 @@ async def transcribe_with_sarvam(audio_bytes: bytes, filename: str = "audio.ogg"
         print("   📋 Creating Sarvam batch job...")
         job = client.speech_to_text_job.create_job(
             model="saaras:v3",
-            mode="transcribe",
+            mode="translit",
             language_code="hi-IN",
             with_diarization=True,
             num_speakers=2,

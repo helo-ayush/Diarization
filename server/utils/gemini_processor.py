@@ -46,8 +46,7 @@ YOUR WORKFLOW & RULES:
    - **Fix speaker assignments** only where logically backward.
    - **Merge fragments** when a speaker's thought is split across consecutive lines.
 
-4. **Hinglish & Formatting:**
-   - Convert Devanagari (Hindi) to Romanized Hinglish.
+4. **Formatting:**
    - Keep technical English words exactly as they are.
 
 5. **Satisfaction Score:**
