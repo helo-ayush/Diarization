@@ -125,10 +125,10 @@ export default function App() {
       const res = await fetch(`${API_URL}/api/v1/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: searchQuery.trim(), 
+        body: JSON.stringify({
+          query: searchQuery.trim(),
           limit: parseInt(searchLimit),
-          all_entries: allEntries 
+          all_entries: allEntries
         }),
       });
       const data = await res.json();
@@ -395,7 +395,7 @@ export default function App() {
               <h3 className="text-sm font-semibold mb-2">Enroll New Agent</h3>
               <p className="text-xs text-gray-500">Record or upload a clear 5-15 second voice sample of the agent speaking.</p>
             </div>
-            
+
             <form onSubmit={handleEnroll}>
               <div className="mb-4">
                 <input
@@ -450,7 +450,7 @@ export default function App() {
             </form>
 
             {enrollError && <div className="error-box mt-6"><Target size={16} /> {enrollError}</div>}
-            
+
             {enrollResult && (
               <div className="results-container mt-6 animate-slide-up border border-green-200 bg-green-50 p-4 rounded-md flex items-center gap-3">
                 <CheckCircle2 size={24} className="text-green-600" />
